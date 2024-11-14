@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Physics Engine - Bouncing Ball</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #1a1a1a;
+            color: #fff;
+            font-family: 'Arial', sans-serif;
+        }
+
+        .main-title {
+            text-align: center;
+            margin-top: 2rem;
+            margin-bottom: 2rem;
+            color: #11dc18;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            font-size: 2.5rem;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+            animation: glow 2s ease-in-out infinite alternate;
+        }
+
+        @keyframes glow {
+            from {
+                text-shadow: 0 0 5px #4CAF50, 0 0 10px #4CAF50;
+            }
+            to {
+                text-shadow: 0 0 10px #4CAF50, 0 0 20px #4CAF50;
+            }
+        }
+
+        .subtitle {
+            color: #888;
+            font-size: 1.1rem;
+            margin-top: -1rem;
+            margin-bottom: 2rem;
+        }
+
+        .container {
+            display: flex;
+            gap: 2rem;
+            padding: 2rem;
+            background-color: #2a2a2a;
+            border-radius: 1rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .controls {
+            width: 300px;
+            padding: 1.5rem;
+            background-color: #333;
+            border-radius: 0.5rem;
+        }
+
+        h2 {
+            font-size: 1.5rem;
+            margin-bottom: 1.5rem;
+            color: #fff;
+            text-align: center;
+        }
+
+        canvas {
+            display: block;
+            background-color: #222;
+            border: 2px solid #444;
+            border-radius: 0.5rem;
+        }
+
+        .control-group {
+            margin-bottom: 1rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #ccc;
+            font-size: 0.9rem;
+        }
+
+        .value-display {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .value-display span {
+            color: #4CAF50;
+            font-family: monospace;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 5px;
+            background: #444;
+            border-radius: 5px;
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 15px;
+            height: 15px;
+            background: #4CAF50;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: background 0.15s ease-in-out;
+        }
+
+        input[type="range"]::-webkit-slider-thumb:hover {
+            background: #45a049;
+        }
+
+        .parameter-name {
+            font-weight: bold;
+            color: #4CAF50;
+        }
+
+        .reset-btn {
+            display: block;
+            width: 100%;
+            padding: 0.8rem;
+            margin-top: 1.5rem;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 0.3rem;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .reset-btn:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <h1 class="main-title">Physics Engine</h1>
+    <h1 class="subtitle">Built using Vannila JS (no packages used)</h1>
+    <h1 class="subtitle">Bouncing Ball Simulation</h1>
+    <div class="container">
+        <div class="simulation">
+            <canvas id="canvas" height="800" width="500"></canvas>
+        </div>
+        <div class="controls">
+            <h2>Physics Parameters</h2>
+            
+            <div class="control-group">
+                <label>Mass (kg)</label>
+                <div class="value-display">
+                    <span id="massValue">1.0</span>
+                </div>
+                <input type="range" id="massInput" min="0.1" max="5" step="0.1" value="1">
+            </div>
+
+            <div class="control-group">
+                <label>Radius (pixels)</label>
+                <div class="value-display">
+                    <span id="radiusValue">40</span>
+                </div>
+                <input type="range" id="radiusInput" min="10" max="150" step="1" value="40">
+            </div>
+
+            <div class="control-group">
+                <label>Bounciness</label>
+                <div class="value-display">
+                    <span id="bouncinessValue">0.25</span>
+                </div>
+                <input type="range" id="bouncinessInput" min="0" max="0.9" step="0.05" value="0.25">
+            </div>
+
+            <div class="control-group">
+                <label>Air Density</label>
+                <div class="value-display">
+                    <span id="densityValue">0.5</span>
+                </div>
+                <input type="range" id="densityInput" min="0.1" max="2" step="0.1" value="0.5">
+            </div>
+
+            <button class="reset-btn" onclick="resetSimulation()">Reset Simulation</button>
+        </div>
+    </div>
+
+    <script>
+        var canvas = document.getElementById('canvas'),
+            ctx = canvas.getContext('2d'),
+            height = 800,
+            width = 500,
+            x = width/2,
+            y = 0,
+            vy = 0,
+            ay = 0,
+            m = 1,    // Ball mass in kg
+            r = 40,  // Ball radius in pixels
+            dt = 0.02,  // Time step
+            e = -0.55,   // Coefficient of restitution ("bounciness")
+            rho = 0.5,  // Density of air
+            C_d = 0.47, // Coefficient of drag for a ball
+            A = Math.PI * r * r / 10000; // Frontal area of the ball
+
+        function createBallGradient() {
+            let gradient = ctx.createRadialGradient(x, y, 0, x, y, r);
+            gradient.addColorStop(0, '#ff6b6b');
+            gradient.addColorStop(1, '#c92a2a');
+            return gradient;
+        }
+
+        function updateParameters() {
+            m = parseFloat(document.getElementById('massInput').value);
+            r = parseFloat(document.getElementById('radiusInput').value);
+            e = -parseFloat(document.getElementById('bouncinessInput').value);
+            rho = parseFloat(document.getElementById('densityInput').value);
+            A = Math.PI * r * r / 10000;
+            
+            // Update display values
+            document.getElementById('massValue').textContent = m.toFixed(1);
+            document.getElementById('radiusValue').textContent = r.toFixed(0);
+            document.getElementById('bouncinessValue').textContent = (-e).toFixed(2);
+            document.getElementById('densityValue').textContent = rho.toFixed(1);
+        }
+
+        function resetSimulation() {
+            y = 0;
+            vy = 0;
+            ay = 0;
+        }
+
+        // Listeners
+        document.querySelectorAll('input[type="range"]').forEach(input => {
+            input.addEventListener('input', updateParameters);
+        });
+
+        function loop() { 
+            var fy = 0;
+            
+            fy += m * 9.81;
+            fy += -1 * 0.5 * rho * C_d * A * vy * vy;
+            
+            dy = vy * dt + (0.5 * ay * dt * dt);
+            y += dy * 100;
+            new_ay = fy / m;
+            avg_ay = 0.5 * (new_ay + ay);
+            vy += avg_ay * dt;
+            
+            if (y + r > height && vy > 0) {
+                vy *= e;
+                y = height - r;
+            }
+            
+            draw();
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, width, height);
+       
+            ctx.beginPath();
+            ctx.fillStyle = createBallGradient();
+            ctx.arc(x, y, r, 0, Math.PI * 2, true);
+            ctx.fill();
+            ctx.closePath();
+
+            ctx.beginPath();
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+            ctx.arc(x - r/3, y - r/3, r/2, 0, Math.PI * 2, true);
+            ctx.fill();
+            ctx.closePath();
+        }
+
+        setInterval(loop, dt * 1000);
+    </script>
+</body>
+</html>

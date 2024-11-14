@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Physics Engine - Rigid Body Suspension</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #1a1a1a;
+            color: #fff;
+            font-family: 'Arial', sans-serif;
+        }
+
+        .main-title {
+            text-align: center;
+            margin-bottom: 2rem;
+            color: #4CAF50;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            font-size: 2.5rem;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+            animation: glow 2s ease-in-out infinite alternate;
+        }
+
+        @keyframes glow {
+            from {
+                text-shadow: 0 0 5px #4CAF50, 0 0 10px #4CAF50;
+            }
+            to {
+                text-shadow: 0 0 10px #4CAF50, 0 0 20px #4CAF50;
+            }
+        }
+
+        .subtitle {
+            color: #888;
+            font-size: 1.1rem;
+            margin-top: -1rem;
+            margin-bottom: 2rem;
+        }
+
+        .container {
+            display: flex;
+            gap: 2rem;
+            padding: 2rem;
+            background-color: #2a2a2a;
+            border-radius: 1rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        canvas {
+            display: block;
+            background-color: #222;
+            border: 2px solid #444;
+            border-radius: 0.5rem;
+        }
+
+        .controls {
+            width: 300px;
+            padding: 1.5rem;
+            background-color: #333;
+            border-radius: 0.5rem;
+        }
+
+        h2 {
+            font-size: 1.5rem;
+            margin-bottom: 1.5rem;
+            color: #fff;
+            text-align: center;
+        }
+
+        .control-group {
+            margin-bottom: 1rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #ccc;
+            font-size: 0.9rem;
+        }
+
+        .value-display {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .value-display span {
+            color: #4CAF50;
+            font-family: monospace;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 5px;
+            background: #444;
+            border-radius: 5px;
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 15px;
+            height: 15px;
+            background: #4CAF50;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: background 0.15s ease-in-out;
+        }
+
+        input[type="range"]::-webkit-slider-thumb:hover {
+            background: #45a049;
+        }
+
+        .reset-btn {
+            display: block;
+            width: 100%;
+            padding: 0.8rem;
+            margin-top: 1.5rem;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 0.3rem;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .reset-btn:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <h1 class="main-title">Physics Engine</h1>
+    <h1 class="subtitle">Built using Vannila JS (no packages used)</h1>
+    <h1 class="subtitle">Rigid Body Spring Mass Suspension Simulation</h1>
+    <div class="container">
+        <div class="simulation">
+            <canvas id="canvas" width="400" height="400"></canvas>
+        </div>
+        <div class="controls">
+            <h2>Physics Parameters</h2>
+            
+            <div class="control-group">
+                <label>Spring Stiffness</label>
+                <div class="value-display">
+                    <span id="stiffnessValue">0.5</span>
+                </div>
+                <input type="range" id="stiffnessInput" min="0.1" max="2" step="0.1" value="0.5">
+            </div>
+
+            <div class="control-group">
+                <label>Linear Damping</label>
+                <div class="value-display">
+                    <span id="dampingValue">1.0</span>
+                </div>
+                <input type="range" id="dampingInput" min="0.1" max="5" step="0.1" value="1.0">
+            </div>
+
+            <div class="control-group">
+                <label>Angular Damping</label>
+                <div class="value-display">
+                    <span id="angularDampingValue">7.0</span>
+                </div>
+                <input type="range" id="angularDampingInput" min="1" max="15" step="0.5" value="7.0">
+            </div>
+
+            <div class="control-group">
+                <label>Initial Velocity (Y)</label>
+                <div class="value-display">
+                    <span id="velocityValue">2.0</span>
+                </div>
+                <input type="range" id="velocityInput" min="0" max="5" step="0.1" value="2.0">
+            </div>
+
+            <button class="reset-btn" onclick="resetSimulation()">Reset Simulation</button>
+        </div>
+    </div>
+
+    <script>
+        var canvas = document.getElementById('canvas'),
+            ctx = canvas.getContext('2d'),
+            height = 400,
+            width = 400,
+            stiffness = 0.5,
+            b = -1,
+            angularB = -7,
+            dt = 0.02;
+
+        var V = function(x, y) {
+            this.x = x;
+            this.y = y;
+        };
+
+        V.prototype.add = function(v) {
+            return new V(v.x + this.x, v.y + this.y);
+        };
+
+        V.prototype.subtract = function(v) {
+            return new V(this.x - v.x, this.y - v.y);
+        };
+
+        V.prototype.scale = function(s) {
+            return new V(this.x * s, this.y * s);
+        };
+
+        V.prototype.dot = function(v) {
+            return (this.x * v.x + this.y * v.y);
+        };
+
+        V.prototype.cross = function(v) {
+            return (this.x * v.y - this.y * v.x);
+        };
+
+        V.prototype.rotate = function(angle, vector) {
+            var x = this.x - vector.x;
+            var y = this.y - vector.y;
+
+            var x_prime = vector.x + ((x * Math.cos(angle)) - (y * Math.sin(angle)));
+            var y_prime = vector.y + ((x * Math.sin(angle)) + (y * Math.cos(angle)));
+
+            return new V(x_prime, y_prime);
+        };
+
+        var Rect = function(x, y, w, h, m) {
+            if (typeof(m) === 'undefined') {
+                this.m = 1;
+            }
+
+            this.width = w;
+            this.height = h;
+
+            this.topLeft = new V(x, y);
+            this.topRight = new V(x + w, y);
+            this.bottomRight = new V(x + w, y + h);
+            this.bottomLeft = new V(x, y + h);
+
+            this.v = new V(0, 0);
+            this.a = new V(0, 0);
+            this.theta = 0;
+            this.omega = 0;
+            this.alpha = 0;
+            this.J = this.m * (this.height*this.height + this.width*this.width) / 12000;
+        };
+
+        Rect.prototype.center = function() {
+            var diagonal = this.bottomRight.subtract(this.topLeft);
+            var midpoint = this.topLeft.add(diagonal.scale(0.5));
+            return midpoint;
+        };
+
+        Rect.prototype.rotate = function(angle) {
+            this.theta += angle;
+            var center = this.center();
+
+            this.topLeft = this.topLeft.rotate(angle, center);
+            this.topRight = this.topRight.rotate(angle, center);
+            this.bottomRight = this.bottomRight.rotate(angle, center);
+            this.bottomLeft = this.bottomLeft.rotate(angle, center);
+
+            return this;
+        };
+
+        Rect.prototype.move = function(v) {
+            this.topLeft = this.topLeft.add(v);
+            this.topRight = this.topRight.add(v);
+            this.bottomRight = this.bottomRight.add(v);
+            this.bottomLeft = this.bottomLeft.add(v);
+
+            return this;
+        }
+
+        var rect = new Rect(300, 0, 150, 50);
+        rect.v = new V(0, 2);
+        var spring = new V(200, 0);
+
+        function updateParameters() {
+            stiffness = parseFloat(document.getElementById('stiffnessInput').value);
+            b = -parseFloat(document.getElementById('dampingInput').value);
+            angularB = -parseFloat(document.getElementById('angularDampingInput').value);
+            let newVelocity = parseFloat(document.getElementById('velocityInput').value);
+            rect.v = new V(0, newVelocity);
+            
+            document.getElementById('stiffnessValue').textContent = stiffness.toFixed(1);
+            document.getElementById('dampingValue').textContent = (-b).toFixed(1);
+            document.getElementById('angularDampingValue').textContent = (-angularB).toFixed(1);
+            document.getElementById('velocityValue').textContent = newVelocity.toFixed(1);
+        }
+
+        function resetSimulation() {
+            rect = new Rect(200, 0, 100, 50);
+            rect.v = new V(0, parseFloat(document.getElementById('velocityInput').value));
+            rect.theta = 0;
+            rect.omega = 0;
+            rect.alpha = 0;
+        }
+
+        document.querySelectorAll('input[type="range"]').forEach(input => {
+            input.addEventListener('input', updateParameters);
+        });
+
+        ctx.strokeStyle = '#4CAF50';
+
+        function loop() {
+            var f = new V(0, 0);
+            var torque = 0;
+
+            var dr = rect.v.scale(dt).add(rect.a.scale(0.5 * dt * dt));
+            rect.move(dr.scale(100));
+
+            f = f.add(new V(0, rect.m * 9.81));
+            f = f.add(rect.v.scale(b));
+            
+            var springForce = rect.topLeft.subtract(spring).scale(-1 * stiffness);
+            var r = rect.center().subtract(rect.topLeft);
+            var rxf = r.cross(springForce);
+
+            torque += -1 * rxf;
+            f = f.add(springForce);
+
+            var new_a = f.scale(rect.m);
+            var dv = rect.a.add(new_a).scale(0.5 * dt);
+            rect.v = rect.v.add(dv);
+            
+            torque += rect.omega * angularB;
+            rect.alpha = torque / rect.J;
+            rect.omega += rect.alpha * dt;
+            var deltaTheta = rect.omega * dt;
+            rect.rotate(deltaTheta);
+
+            draw();
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, width, height);
+        
+            ctx.strokeStyle = '#666';
+            ctx.beginPath();
+            ctx.moveTo(spring.x, spring.y);
+            ctx.lineTo(rect.topLeft.x, rect.topLeft.y);
+            ctx.stroke();
+            ctx.closePath();
+            
+            ctx.strokeStyle = '#4CAF50';
+            ctx.save();
+            ctx.translate(rect.topLeft.x, rect.topLeft.y);
+            ctx.rotate(rect.theta);
+            ctx.strokeRect(0, 0, rect.width, rect.height);
+
+            let gradient = ctx.createLinearGradient(0, 0, rect.width, rect.height);
+            gradient.addColorStop(0, '#4CAF5033');
+            gradient.addColorStop(1, '#4CAF5066');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, rect.width, rect.height);
+            
+            ctx.restore();
+        }
+
+        setInterval(loop, dt*1000);
+    </script>
+</body>
+</html>
